@@ -1,1 +1,1 @@
-# Matric_Manipulation
+# Matrix_Manipulation
