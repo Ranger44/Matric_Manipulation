@@ -1,0 +1,476 @@
+#Holly Straley
+#CS344 - MATRICES
+# Script to compute matrix operations using input from either a file or stdin.
+# Input will be intergers seperated by tabs into a rectangular matrix.
+# The script can  print the dimensions of a matrix, tranpose a matirx,
+# calculate the mean vector of a matrix, add two matrices, and
+# multiply two matrices.#
+#
+#
+#All temp file created in this program will have same PID
+PID=$$
+#The first argument is the operation to be performed
+operation=$1
+
+###########################################################
+#Validate function takes 2 arguments, validates that each 
+#file is readable
+###########################################################
+validate () {
+	if [[ $# > 2 ]]
+	then
+		echo "Too many arguments." >&2
+		exit 1
+	fi
+	if [[ $# > 0 ]] 
+	then
+		if [[ ! -r $1 ]]
+		then
+			echo "Invalid file $1" >&2	
+			exit 1
+		fi
+
+		if [[ $NUM_ARGS == 2 && ! -r $2 ]]
+		then
+			echo "Invalid file $2" >&2
+			exit 1
+		fi	
+	fi
+	return 0
+}
+
+###########################################################
+#Dims function takes 1 arguments, prints the dimensions
+#of the matrix
+###########################################################
+dims () {
+	numRows=0
+	numCols=0
+	if [[ $# != 1 ]] #if no argument then need to get matrix from stdin
+	then
+		temp="./temp$PID"
+		cat > "$temp"
+		tempFile="./temp0$PID"
+		while read matrix
+		do
+			((numRows++))
+			echo "$matrix" >> "$tempFile"
+		done < $temp
+		numCols=$(grep -o $'\t' $tempFile | wc -l)
+		numCols=$((numCols/numRows))
+		((numCols++))
+		echo "$numRows $numCols"
+	else		#1 argument so matrix is $1
+		tempFile="./temp1$PID"
+		while read line || [ -n "$line" ]
+		do
+			if [[ $numRows == 0 ]]
+			then
+				echo "$line" > "$tempFile"
+			else
+				echo "$line" >> "$tempFile"
+			fi
+			((numRows++))
+		done < $1
+		numCols=$(grep -o $'\t' $tempFile | wc -l)
+		numCols=$((numCols/numRows))
+		((numCols++))
+		echo "$numRows $numCols"
+	fi
+
+#remove all files made throughout this program, all contain $PID
+rm -f *$PID
+
+return 0
+}
+
+###########################################################
+#Transpose function takes 1 arguments, prints new matrix
+###########################################################
+transpose () {
+	numRows=0
+	numCols=0
+	if [[ $# != 1 ]]  #read from file or stdin
+	then
+		temp="./temp$PID"
+		cat > "$temp"
+		tempFile="./temp0$PID"
+		while read matrix
+		do
+			echo "$matrix" >> "$tempFile"
+			((numRows++))
+		done < $temp
+		numCols=$(grep -o $'\t' $tempFile | wc -l)
+		numCols=$((numCols/numRows))
+		((numCols++))
+	else		#read from file
+		tempFile="./temp1$PID"
+		while read matrix
+		do
+			echo "$matrix" >> "$tempFile"
+			((numRows++))
+		done < $1
+		numCols=$(grep -o $'\t' $tempFile | wc -l)
+		numCols=$((numCols/numRows))
+		((numCols++))
+	fi
+	
+	#converting matrix rows to columns then printing
+	tempCol="tempCol$PID"
+	tempRow="tempRow$PID"
+	tempFile2="./tempFile3$PID"
+	i=1
+	while [[ "$i" -le "$numCols" ]]
+	do
+	cut -f "$i" $tempFile | head -c -1 > $tempCol
+	cat $tempCol > "$tempRow"
+	cat $tempCol | tr '\n' '\t' > "$tempRow"
+	((i++))
+		echo >> "$tempRow"
+		cat $tempRow
+	done	
+#remove all files made throughout this program, all contain $PID
+rm -f *$PID
+
+return 0
+}
+
+###########################################################
+#Mean function takes 1 arguments, calculates mean of each 
+#row, prints a new matrix consisting of the means.
+###########################################################
+mean () {
+	numRows=0
+	numCols=0
+
+	#read from file or stdin
+	if [[ $# != 1 ]] 
+	then
+		temp="./temp$PID"
+		cat > "$temp"
+		tempFile="./temp0$PID"
+		while read line || [ -n "$line" ]
+		do
+			echo "$line" >> "$tempFile"
+			((numRows++))
+		done < $temp
+		numCols=$(grep -o $'\t' $tempFile | wc -l)
+		numCols=$((numCols/numRows))
+		((numCols++))
+	else
+		tempFile="./temp1$PID"
+		
+		while read line || [ -n "$line" ]
+		do
+			echo "$line" >> "$tempFile"
+			((numRows++))
+		done < $1
+		
+		numCols=$(grep -o $'\t' $tempFile | wc -l)
+		numCols=$((numCols/numRows))
+		((numCols++))
+	fi
+
+	tempRow="tempRow$PID"
+	tempCol="tempCol$PID"
+	meanFile="tempMean$PID"
+	i=1
+	sum=0
+	while [[ "$i" -le "$numCols" ]]
+	do
+		if [[ "$i" -gt 1 ]]
+		then
+			echo -n "	" >> $meanFile
+		fi
+		sum=0
+
+		thisCol=$(cut -f "$i" $tempFile)
+		for num in $thisCol
+		do
+			sum=$(($sum+$num))
+		done
+		mean=$((($sum+($numRows/2)*(($sum>0)*2-1))/$numRows))
+		echo -n $mean >> $meanFile
+		((i++))
+	done		
+	echo >> $meanFile
+	cat $meanFile
+
+#remove all files made throughout this program, all contain $PID
+rm -f *$PID
+
+return 0
+}
+
+###########################################################
+#Add function takes 2 arguments, prints new matrix
+###########################################################
+add () {
+	if [[ "$(dims $1)" != "$(dims $2)" ]]
+	then
+		echo "Matrix dimensions do not match" >&2
+		exit 1
+	fi
+
+	#read from input files to temp files	
+	#only one set of numRows/numCols needed since they are the same for both files
+	numRows=0
+	numCols=0
+	
+	#argument 1 file
+	file1="./temp1$PID"
+	rowCount=0
+	while read line || [ -n "$line" ]
+	do
+		if [[ $rowCount == 0 ]]
+		then
+			echo "$line" > "$file1"
+			((rowCount++))
+		else
+			echo "$line" >> "$file1"
+		fi
+		((numRows++))
+	done < $1
+	numCols=$(grep -o $'\t' $file1 | wc -l)
+	numCols=$((numCols/numRows))
+	((numCols++))
+	
+	#arugment 2 file
+	file2="./temp2$PID"
+	rowCount=0
+	while read line || [ -n "$line" ]
+	do
+		if [[ $rowCount == 0 ]]
+		then
+			echo "$line" > "$file2"
+			((rowCount++))
+		else
+			echo "$line" >> "$file2"
+		fi
+	done < $2
+	
+	#matrix addition
+	newFile="./temp3$PID"
+	int1=0
+	rowCount=1
+	colCount=1
+	while [ "$rowCount" -le "$numRows" ]
+	do
+		while [ "$colCount" -le "$numCols" ]
+		do
+			#add file1[rowCount][colCount] + file2[rowCount][colCount]
+			#print to newFile
+		#	echo "$rowCount $colCount"
+			#cat $file1 | cut -f $colCount | head -n $rowCount | tail -n 1 > $newFile1 
+			int1="$(cat $file1 | cut -f $colCount | head -n $rowCount | tail -n 1)"
+			int2="$(cat $file2 | cut -f $colCount | head -n $rowCount | tail -n 1)"
+			int3=$((int1+int2))	
+#			while read num 
+#			do
+#				echo "$num" > int1
+#				echo "int1: $int1"
+#			done < $newFile1
+			
+			echo -n $int3 >> $newFile
+			if [[ $colCount == $(($numCols)) ]]
+			then
+				echo >> $newFile
+			else
+				echo -n "	" >> $newFile
+			fi
+				
+		#	echo "$int1 $int2 $int3"
+			((colCount++))
+		done
+		colCount=1
+		((rowCount++))
+	done
+	cat $newFile
+
+
+#remove all files made throughout this program, all contain $PID
+rm -f *$PID
+
+return 0
+}
+
+###########################################################
+#Multiply function takes 2 arguments, prints new matrix
+###########################################################
+multiply () { 
+	#validate that the dimensions of the amtrices are appropriate for muliplication
+	#file1 numCols must equal file2 numRows
+	echo "$(dims $2)" > dims2		#save dimensions of arg $2 to dims2
+	echo "$(dims $1)" > dims1		#save dimensions of arg $1 to dims1
+	file2RowNum=$(cat dims2 | cut -d' ' -f 1)  #file2 number of rows is 1st argument of dims2
+	file1ColNum=$(cat dims1 | cut -d' ' -f 2)  #file1 number of cols is 2nd argument of dims1
+	if [[ "$file1ColNum" != "$file2RowNum" ]]
+	then
+		echo "Matrix dimensions incorrect for multiplication" >&2
+		exit 1
+	fi
+
+	#read from input files to temp files	
+	#only need to track one set of numRows/numCols
+	numRows=0
+	numCols=0
+	
+	#argument 1 file
+	file1="./temp1$PID"
+	rowCount=0		#rowCount to determine when to write to file vs append
+	while read line || [ -n "$line" ]	#read file one line at a time
+	do
+		if [[ $rowCount == 0 ]]
+		then
+			echo "$line" > "$file1"
+			((rowCount++))
+		else
+			echo "$line" >> "$file1"
+		fi
+		((numRows++))
+	done < $1
+	numCols=$(grep -o $'\t' $file1 | wc -l)
+	numCols=$((numCols/numRows))
+	((numCols++))
+
+	#arugment 2 file
+	file2="./temp2$PID"
+	rowCount=0
+	while read line || [ -n "$line" ]
+	do
+		if [[ $rowCount == 0 ]]
+		then
+			echo "$line" > "$file2"
+			((rowCount++))
+		else
+			echo "$line" >> "$file2"
+		fi
+	done < $2
+
+	#converting matrix rows to columns for file2
+	tempCol="./tempCol$PID"
+	tempRow="./tempRow$PID"
+	m2="./tempm2$PID"  #tranposed $2 matrix
+	#cat "$file2"
+	i=1
+	while [[ "$i" -le "$numRows" ]]
+	do
+		cut -f "$i" $file2 | head -c -1 > $tempCol
+		cat $tempCol > "$tempRow"
+		cat $tempCol | tr '\n' '\t' > "$tempRow"
+		((i++))
+		cat "$tempRow" >> "$m2"
+		echo >> "$m2"
+	done	
+
+	#matrix multiplication
+	newFile="./temp3$PID"
+	f1RowCount=1
+	f2RowCount=1
+	colCount=1
+	sum=0
+	while [ "$f1RowCount" -le "$numRows" ]
+	do
+		while [ "$f2RowCount" -le "$numRows" ]
+		do
+			int1="$(cat $file1 | cut -f $colCount | head -n $rowCount | tail -n 1)"
+		
+			sum=0
+
+			while [ "$colCount" -le "$numCols" ]
+			do
+				int1="$(cat $file1 | cut -f $colCount | head -n $f1RowCount | tail -n 1)"
+			
+				int2="$(cat $m2 | cut -f $colCount | head -n $f2RowCount | tail -n 1)"
+			
+				int3="$((int1*int2))"   
+			
+				sum="$((sum+int3))"
+			
+				((colCount++))
+			done
+			echo -n $sum >> $newFile
+			if [[ "$f2RowCount" = "$numRows" ]]
+			then
+				echo >> $newFile
+			else
+				echo -n "	" >> $newFile
+			fi
+			colCount=1
+			((f2RowCount++))
+		done
+		colCount=1
+		f2RowCount=1
+		((f1RowCount++))
+	done
+	cat $newFile
+
+#remove all files made throughout this program, all contain $PID
+rm -f *$PID
+
+return 0
+}
+
+
+#########################################################
+# START OF MAIN
+# #######################################################
+
+#Validate arguments and verify that files are readable
+validate $2 $3
+
+#Use arg $1 to determine the operation to perform
+if [[ $operation = "dims" ]]
+then
+	if [[ "$#" -gt 2 ]] 
+	then 	
+		echo "Wrong number of arguments for dims" >&2
+		exit 1
+	else
+		dims $2
+	fi
+
+elif [[ $operation = "transpose" ]]
+then	
+	if [[ "$#" -gt 2 ]] 
+	then 	
+		echo "Wrong number of arguments for transpose" >&2
+		exit 1
+	else
+		transpose $2
+	fi
+elif [[ $operation = "mean" ]]
+then 
+	if [[ "$#" -gt 2 ]] 
+	then 	
+		echo "Wrong number of arguments for mean" >&2
+		exit 1
+	else
+		mean $2
+	fi
+elif [[ $operation = "add" ]]
+then 
+	if [[ "$#" -ne 3 ]] 
+	then 	
+		echo "Wrong number of arguments for add" >&2
+		exit 1
+	else
+		$1 "${@:2}"		
+	fi
+elif [[ $operation = "multiply" ]]
+then 
+	if [[ "$#" -ne 3 ]] 
+	then 	
+		echo "Wrong number of arguments for multiply" >&2
+		exit 1
+	else
+		multiply $2 $3
+	fi
+else
+	#if valid operation not entered, return error
+	echo "Invalid operation" >&2
+	exit 1
+fi
+
+#remove all files made throughout this program, all contain $PID
+rm -f *$PID
